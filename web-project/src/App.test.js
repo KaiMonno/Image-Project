@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+test('renders the taste builder', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  expect(screen.getByText(/build a snapshot of your taste/i)).toBeInTheDocument();
+  expect(screen.getByText(/loading options from the image database/i)).toBeInTheDocument();
 });

@@ -21,3 +21,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# local backend runtime data
+/backend/venv/__pycache__/
+/backend/venv/taste_catalog.db
+/backend/venv/processed_images/user_*

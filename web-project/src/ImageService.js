@@ -1,25 +1,30 @@
+import { API_BASE_URL } from './config';
+
 const uploadImage = (imageFile, category, userId = 'default_user') => {
   const formData = new FormData();
   formData.append('image', imageFile);
 
-  return fetch(`http://localhost:5000/upload-image/${category}?user_id=${userId}`, {
-      method: 'POST',
-      body: formData
-  }).then(response => {
-    console.log('Response received from server:', response.status);  // debugging to see if response received
+  const encodedUserId = encodeURIComponent(userId);
 
-    if (response.ok) {
-      return response.blob();
+  return fetch(`${API_BASE_URL}/upload-image/${category}?user_id=${encodedUserId}`, {
+    method: 'POST',
+    body: formData,
+  }).then(async (response) => {
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(errorBody.error || 'Network response was not ok.');
     }
-    
-    throw new Error('Network response was not ok.');
-  }).then(blob => {
-    console.log('Blob received from server');  // debugging to see blob received
 
-    // converting blob into url
-    return URL.createObjectURL(blob);
-  }).catch(error => {
-    console.error('Error in uploadImage:', error);  // errors
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('image/')) {
+      const blob = await response.blob();
+      return {
+        status: 'complete',
+        imageUrl: URL.createObjectURL(blob),
+      };
+    }
+
+    return response.json();
   });
 };
 
