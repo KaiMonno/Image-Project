@@ -89,6 +89,46 @@ h1 {
   font-size: clamp(1.4rem, 3vw, 2.2rem);
 }
 
+.catalog-search {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.catalog-search input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font: inherit;
+  padding: 12px 14px;
+}
+
+.catalog-search input:focus {
+  border-color: #4f46e5;
+  outline: 2px solid #c7d2fe;
+}
+
+.catalog-search button {
+  background: #4f46e5;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 18px;
+}
+
+.catalog-search button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.catalog-search .secondary-action {
+  background: #e5e7eb;
+  color: #111827;
+}
+
 .option-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -133,6 +173,12 @@ h1 {
 .option-card span {
   color: #6b7280;
   line-height: 1.4;
+}
+
+.option-card small {
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .primary-action {
@@ -202,5 +248,14 @@ h1 {
   .option-grid,
   .selection-summary {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-search {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .catalog-search input {
+    grid-column: 1 / -1;
   }
 }

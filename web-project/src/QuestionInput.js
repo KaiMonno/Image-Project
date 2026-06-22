@@ -13,11 +13,16 @@ function QuestionInput() {
   const [finalImageUrl, setFinalImageUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [userId] = useState(() => `user_${Date.now()}_${Math.random().toString(36).slice(2)}`);
 
   const currentCategory = categoryOrder[currentStep];
   const currentCategoryDetails = catalog[currentCategory];
   const isComplete = Boolean(finalImageUrl);
+  const displayedOptions = searchResults ?? currentCategoryDetails.options;
 
   useEffect(() => {
     let isMounted = true;
@@ -52,9 +57,56 @@ function QuestionInput() {
     };
   }, []);
 
+  useEffect(() => {
+    setSearchQuery('');
+    setSearchResults(null);
+    setSearchError('');
+  }, [currentCategory]);
+
   const handleOptionClick = (option) => {
     setSelectedOption(option);
     setError('');
+  };
+
+  const handleSearch = async (event) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+
+    if (query.length < 2 || isSearching) {
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError('');
+    setSelectedOption(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/search/${currentCategory}?q=${encodeURIComponent(query)}`
+      );
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(body.error || 'Search failed.');
+      }
+
+      setSearchResults(body.options);
+      if (body.options.length === 0) {
+        setSearchError(`No ${currentCategoryDetails.label.toLowerCase()} results found.`);
+      }
+    } catch (searchRequestError) {
+      setSearchResults([]);
+      setSearchError(searchRequestError.message || 'Search failed.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults(null);
+    setSearchError('');
+    setSelectedOption(null);
   };
 
   const handleConfirm = async () => {
@@ -123,8 +175,28 @@ function QuestionInput() {
               <h2>{currentCategoryDetails.prompt}</h2>
             </div>
 
+            <form className="catalog-search" onSubmit={handleSearch}>
+              <input
+                aria-label={`Search ${currentCategoryDetails.label}`}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={`Search the ${currentCategoryDetails.label.toLowerCase()} database`}
+                type="search"
+                value={searchQuery}
+              />
+              <button disabled={searchQuery.trim().length < 2 || isSearching} type="submit">
+                {isSearching ? 'Searching...' : 'Search'}
+              </button>
+              {searchResults !== null && (
+                <button className="secondary-action" onClick={clearSearch} type="button">
+                  Clear
+                </button>
+              )}
+            </form>
+
+            {searchError && <p className="error-message">{searchError}</p>}
+
             <div className="option-grid">
-              {currentCategoryDetails.options.map((option) => (
+              {displayedOptions.map((option) => (
                 <button
                   className={`option-card ${selectedOption?.id === option.id ? 'selected' : ''}`}
                   key={option.id}
@@ -134,6 +206,7 @@ function QuestionInput() {
                   <img src={option.imageUrl} alt="" />
                   <strong>{option.name}</strong>
                   <span>{option.description}</span>
+                  {option.provider && <small>Source: {option.provider}</small>}
                 </button>
               ))}
             </div>

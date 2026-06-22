@@ -1,8 +1,14 @@
 from flask import Flask, request, send_file, send_from_directory, jsonify
 from flask_cors import CORS
 from PIL import Image, ImageDraw, ImageFile
+import base64
+import json
 import os
 import sqlite3
+import time
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode, urlparse
+from urllib.request import Request, urlopen
 
 app = Flask(__name__)
 CORS(app)
@@ -18,6 +24,27 @@ CIRCLE_CENTER = (270, 390)
 CIRCLE_RADIUS = 112
 BACKGROUND_COLOR = '#d9ecfb'
 BORDER_COLOR = '#111827'
+TMDB_API_URL = 'https://api.themoviedb.org/3'
+TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500'
+SPOTIFY_API_URL = 'https://api.spotify.com/v1'
+SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
+ALLOWED_IMAGE_HOSTS = {'image.tmdb.org', 'i.scdn.co', 'mosaic.scdn.co'}
+spotify_token_cache = {'access_token': None, 'expires_at': 0}
+
+def load_environment_file(filepath):
+    if not os.path.exists(filepath):
+        return
+
+    with open(filepath, encoding='utf-8') as environment_file:
+        for raw_line in environment_file:
+            line = raw_line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+
+            key, value = line.split('=', 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+load_environment_file(os.path.join(PROJECT_DIR, '.env'))
 
 CATALOG_DETAILS = {
     'artist': {
@@ -35,15 +62,20 @@ CATALOG_DETAILS = {
 }
 
 SEED_CATALOG_ITEMS = [
-    ('artist-visual', 'artist', 'Neon Headliner', 'Bright, high-energy, and stage-ready.', 'image1.jpeg'),
-    ('artist-indie', 'artist', 'Indie Favorite', 'Warm, personal, and a little unexpected.', 'image2.jpg'),
-    ('artist-classic', 'artist', 'Classic Icon', 'Timeless taste with a polished edge.', 'image3.jpg'),
-    ('movie-dreamy', 'movie', 'Dream Sequence', 'Soft, cinematic, and atmospheric.', 'image1.jpeg'),
-    ('movie-action', 'movie', 'Midnight Feature', 'Bold pacing with a dramatic finish.', 'image2.jpg'),
-    ('movie-comfort', 'movie', 'Comfort Rewatch', 'Familiar, expressive, and easy to love.', 'image3.jpg'),
-    ('show-binge', 'show', 'Weekend Binge', 'A little addictive and full of momentum.', 'image1.jpeg'),
-    ('show-prestige', 'show', 'Prestige Pick', 'Carefully made and conversation-worthy.', 'image2.jpg'),
-    ('show-comedy', 'show', 'Easy Favorite', 'Reliable, bright, and rewatchable.', 'image3.jpg'),
+    ('local-artist', 'artist', 'Local Artist', 'Current local artist image.', 'image1.jpeg'),
+    ('local-movie', 'movie', 'Local Movie', 'Current local movie poster.', 'image2.jpg'),
+    ('local-show', 'show', 'Local Show', 'Current local show image.', 'image3.jpg'),
+]
+LEGACY_SEED_IDS = [
+    'artist-visual',
+    'artist-indie',
+    'artist-classic',
+    'movie-dreamy',
+    'movie-action',
+    'movie-comfort',
+    'show-binge',
+    'show-prestige',
+    'show-comedy',
 ]
 
 storage_dir = os.path.join(BASE_DIR, 'processed_images')
@@ -67,15 +99,17 @@ def init_database():
             )
             """
         )
-        item_count = connection.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
-        if item_count == 0:
-            connection.executemany(
-                """
-                INSERT INTO catalog_items (id, category, name, description, image_filename)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                SEED_CATALOG_ITEMS,
-            )
+        connection.executemany(
+            "DELETE FROM catalog_items WHERE id = ?",
+            [(item_id,) for item_id in LEGACY_SEED_IDS],
+        )
+        connection.executemany(
+            """
+            INSERT OR IGNORE INTO catalog_items (id, category, name, description, image_filename)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            SEED_CATALOG_ITEMS,
+        )
 
 init_database()
 
@@ -114,6 +148,181 @@ def get_catalog():
 @app.route('/catalog-images/<path:filename>', methods=['GET'])
 def get_catalog_image(filename):
     return send_from_directory(PUBLIC_IMAGE_DIR, filename)
+
+@app.route('/api/search/<category>', methods=['GET'])
+def search_external_catalog(category):
+    if category not in STORAGE_CATEGORIES:
+        return jsonify(error='Unknown category.'), 400
+
+    query = request.args.get('q', '').strip()
+    if len(query) < 2:
+        return jsonify(error='Enter at least two characters.'), 400
+
+    try:
+        if category == 'artist':
+            options = search_spotify_artists(query)
+        else:
+            options = search_tmdb(query, category)
+    except ProviderConfigurationError as error:
+        return jsonify(error=str(error), code='provider_not_configured'), 503
+    except ProviderRequestError as error:
+        return jsonify(error=str(error), code='provider_request_failed'), 502
+
+    return jsonify(options=options)
+
+@app.route('/api/image-proxy', methods=['GET'])
+def proxy_external_image():
+    image_url = request.args.get('url', '').strip()
+    parsed_url = urlparse(image_url)
+
+    if parsed_url.scheme != 'https' or parsed_url.hostname not in ALLOWED_IMAGE_HOSTS:
+        return jsonify(error='Image host is not allowed.'), 400
+
+    try:
+        image_request = Request(image_url, headers={'User-Agent': 'TasteCollage/1.0'})
+        with urlopen(image_request, timeout=15) as response:
+            content_type = response.headers.get_content_type()
+            if not content_type.startswith('image/'):
+                return jsonify(error='The provider did not return an image.'), 502
+
+            return response.read(), 200, {
+                'Content-Type': content_type,
+                'Cache-Control': 'public, max-age=86400',
+            }
+    except (HTTPError, URLError, TimeoutError):
+        return jsonify(error='Could not download the provider image.'), 502
+
+class ProviderConfigurationError(Exception):
+    pass
+
+class ProviderRequestError(Exception):
+    pass
+
+def search_tmdb(query, category):
+    api_token = os.environ.get('TMDB_API_TOKEN')
+    if not api_token:
+        raise ProviderConfigurationError(
+            'TMDB_API_TOKEN is required to search movies and shows.'
+        )
+
+    media_type = 'movie' if category == 'movie' else 'tv'
+    payload = fetch_json(
+        f"{TMDB_API_URL}/search/{media_type}?{urlencode({'query': query, 'include_adult': 'false'})}",
+        headers={'Authorization': f'Bearer {api_token}'},
+    )
+
+    options = []
+    for item in payload.get('results', []):
+        poster_path = item.get('poster_path')
+        if not poster_path:
+            continue
+
+        name = item.get('title') if category == 'movie' else item.get('name')
+        date = item.get('release_date') if category == 'movie' else item.get('first_air_date')
+        year = date[:4] if date else 'Date unavailable'
+        provider_image_url = f"{TMDB_IMAGE_URL}{poster_path}"
+        options.append({
+            'id': f"tmdb-{category}-{item['id']}",
+            'name': name or 'Untitled',
+            'description': year,
+            'imageUrl': build_proxy_url(provider_image_url),
+            'provider': 'TMDB',
+        })
+
+        if len(options) == 12:
+            break
+
+    return options
+
+def search_spotify_artists(query):
+    token = get_spotify_access_token()
+    payload = fetch_json(
+        f"{SPOTIFY_API_URL}/search?{urlencode({'q': query, 'type': 'artist', 'limit': 12})}",
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    options = []
+    for item in payload.get('artists', {}).get('items', []):
+        images = item.get('images', [])
+        if not images:
+            continue
+
+        genres = item.get('genres', [])
+        description = ', '.join(genres[:2]) if genres else 'Artist'
+        options.append({
+            'id': f"spotify-artist-{item['id']}",
+            'name': item.get('name', 'Unknown artist'),
+            'description': description,
+            'imageUrl': build_proxy_url(images[0]['url']),
+            'provider': 'Spotify',
+        })
+
+    return options
+
+def get_spotify_access_token():
+    now = time.time()
+    if (
+        spotify_token_cache['access_token']
+        and spotify_token_cache['expires_at'] > now + 30
+    ):
+        return spotify_token_cache['access_token']
+
+    client_id = os.environ.get('SPOTIFY_CLIENT_ID')
+    client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET')
+    if not client_id or not client_secret:
+        raise ProviderConfigurationError(
+            'SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are required to search artists.'
+        )
+
+    credentials = base64.b64encode(
+        f"{client_id}:{client_secret}".encode('utf-8')
+    ).decode('ascii')
+    token_request = Request(
+        SPOTIFY_TOKEN_URL,
+        data=urlencode({'grant_type': 'client_credentials'}).encode('utf-8'),
+        headers={
+            'Authorization': f'Basic {credentials}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        method='POST',
+    )
+
+    try:
+        with urlopen(token_request, timeout=15) as response:
+            payload = json.load(response)
+    except (HTTPError, URLError, TimeoutError, ValueError) as error:
+        raise ProviderRequestError('Spotify authentication failed.') from error
+
+    spotify_token_cache['access_token'] = payload['access_token']
+    spotify_token_cache['expires_at'] = now + payload.get('expires_in', 3600)
+    return spotify_token_cache['access_token']
+
+def fetch_json(url, headers=None):
+    api_request = Request(
+        url,
+        headers={
+            'Accept': 'application/json',
+            'User-Agent': 'TasteCollage/1.0',
+            **(headers or {}),
+        },
+    )
+
+    try:
+        with urlopen(api_request, timeout=15) as response:
+            return json.load(response)
+    except HTTPError as error:
+        if error.code in (401, 403):
+            message = 'The provider rejected the configured credentials.'
+        elif error.code == 429:
+            message = 'The provider rate limit was reached. Try again shortly.'
+        else:
+            message = 'The provider search request failed.'
+        raise ProviderRequestError(message) from error
+    except (URLError, TimeoutError, ValueError) as error:
+        raise ProviderRequestError('Could not reach the image provider.') from error
+
+def build_proxy_url(image_url):
+    return f"{request.host_url.rstrip('/')}/api/image-proxy?url={quote(image_url, safe='')}"
 
 @app.route('/upload-image/<category>', methods=['POST'])
 def upload_image(category):
@@ -245,4 +454,4 @@ def draw_borders(card):
 def index(): return 'Welcome to the Flask backend!'
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
