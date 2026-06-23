@@ -149,9 +149,9 @@ function QuestionInput() {
     <main className="taste-builder">
       <section className="builder-panel">
         <p className="eyebrow">Taste Collage</p>
-        <h1>Build a snapshot of your taste.</h1>
+        <h1>Create an image that is reprsentative of your taste and aesthetic</h1>
         <p className="intro">
-          Choose one artist, movie, and show. The app combines your picks into a single shareable image.
+          Choose a single artist, movie, and show. This app will combine all into a single image
         </p>
 
         <div className="step-list" aria-label="Progress">

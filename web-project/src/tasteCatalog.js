@@ -1,7 +1,7 @@
 const tasteCatalog = {
   artist: {
     label: 'Artist',
-    prompt: 'Pick an artist that represents your sound.',
+    prompt: 'Choose an artist that represents your taste.',
     options: [
       {
         id: 'local-artist',
@@ -13,7 +13,7 @@ const tasteCatalog = {
   },
   movie: {
     label: 'Movie',
-    prompt: 'Pick a movie that fits your visual taste.',
+    prompt: 'Choose a film that evokes your taste.',
     options: [
       {
         id: 'local-movie',
@@ -25,7 +25,7 @@ const tasteCatalog = {
   },
   show: {
     label: 'Show',
-    prompt: 'Pick a show that belongs on your profile.',
+    prompt: 'Choose a show that describes your taste.',
     options: [
       {
         id: 'local-show',

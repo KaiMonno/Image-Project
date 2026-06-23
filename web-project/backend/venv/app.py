@@ -237,7 +237,7 @@ def search_tmdb(query, category):
 def search_spotify_artists(query):
     token = get_spotify_access_token()
     payload = fetch_json(
-        f"{SPOTIFY_API_URL}/search?{urlencode({'q': query, 'type': 'artist', 'limit': 12})}",
+        f"{SPOTIFY_API_URL}/search?{urlencode({'q': query, 'type': 'artist', 'limit': 10})}",
         headers={'Authorization': f'Bearer {token}'},
     )
 
