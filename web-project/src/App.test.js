@@ -15,7 +15,9 @@ afterEach(() => {
 
 test('renders the taste builder', async () => {
   render(<App />);
-  expect(screen.getByText(/build a snapshot of your taste/i)).toBeInTheDocument();
+  expect(
+    screen.getByText(/create an image that is representative of your taste and aesthetic/i)
+  ).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: /local artist/i })).toBeInTheDocument();
   expect(screen.getByRole('searchbox', { name: /search artist/i })).toBeInTheDocument();
 });

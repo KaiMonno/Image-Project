@@ -23,6 +23,7 @@ function QuestionInput() {
   const currentCategoryDetails = catalog[currentCategory];
   const isComplete = Boolean(finalImageUrl);
   const displayedOptions = searchResults ?? currentCategoryDetails.options;
+  const selectedCount = Object.keys(selections).length;
 
   useEffect(() => {
     let isMounted = true;
@@ -148,11 +149,28 @@ function QuestionInput() {
   return (
     <main className="taste-builder">
       <section className="builder-panel">
-        <p className="eyebrow">Taste Collage</p>
-        <h1>Create an image that is reprsentative of your taste and aesthetic</h1>
-        <p className="intro">
-          Choose a single artist, movie, and show. This app will combine all into a single image
-        </p>
+        <header className="builder-header">
+          <div className="builder-copy">
+            <p className="eyebrow">Taste Collage</p>
+            <h1>Create an image that is representative of your taste and aesthetic</h1>
+            <p className="intro">
+              Choose a single artist, movie, and show. This app will combine all into a single image.
+            </p>
+          </div>
+
+          <div className="hero-preview" aria-hidden="true">
+            {categoryOrder.map((category, index) => {
+              const previewOption = selections[category] || catalog[category].options[0];
+
+              return (
+                <div className={`preview-tile preview-tile-${index + 1}`} key={category}>
+                  <img src={previewOption.imageUrl} alt="" />
+                  <span>{catalog[category].label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </header>
 
         <div className="step-list" aria-label="Progress">
           {categoryOrder.map((category, index) => (
@@ -160,6 +178,7 @@ function QuestionInput() {
               className={`step-pill ${index === currentStep ? 'active' : ''} ${selections[category] ? 'done' : ''}`}
               key={category}
             >
+              <span>{selections[category] ? '✓' : index + 1}</span>
               {catalog[category].label}
             </div>
           ))}
@@ -173,6 +192,18 @@ function QuestionInput() {
             <div className="question-header">
               <span>Step {currentStep + 1} of {categoryOrder.length}</span>
               <h2>{currentCategoryDetails.prompt}</h2>
+            </div>
+
+            <div className="selection-strip" aria-label="Current selections">
+              {categoryOrder.map((category) => (
+                <div className={`selection-chip ${selections[category] ? 'filled' : ''}`} key={category}>
+                  <span>{catalog[category].label}</span>
+                  <strong>{selections[category]?.name || 'Choose next'}</strong>
+                </div>
+              ))}
+              <div className="selection-meter">
+                <span style={{ width: `${(selectedCount / categoryOrder.length) * 100}%` }} />
+              </div>
             </div>
 
             <form className="catalog-search" onSubmit={handleSearch}>
