@@ -332,14 +332,20 @@ span::selection {
 }
 
 .catalog-search button,
-.primary-action {
+.primary-action,
+.secondary-action.standalone {
   border: 0;
   border-radius: 6px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: #ffffff;
   cursor: pointer;
   font-weight: 750;
+  text-decoration: none;
   transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.catalog-search button,
+.primary-action {
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #ffffff;
 }
 
 .catalog-search button {
@@ -354,19 +360,23 @@ span::selection {
 }
 
 .catalog-search button:disabled,
-.primary-action:disabled {
+.primary-action:disabled,
+.secondary-action.standalone:disabled {
   background: #aeb7b2;
   cursor: not-allowed;
 }
 
-.catalog-search .secondary-action {
+.catalog-search .secondary-action,
+.secondary-action.standalone {
   background: #e9edf2;
   color: var(--ink);
 }
 
-.catalog-search .secondary-action:hover {
+.catalog-search .secondary-action:hover,
+.secondary-action.standalone:hover:not(:disabled) {
   background: #d9e0dc;
-  box-shadow: none;
+  box-shadow: 0 8px 18px rgba(21, 23, 29, 0.08);
+  transform: translateY(-1px);
 }
 
 .option-grid {
@@ -489,11 +499,36 @@ span::selection {
 }
 
 .primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 190px;
-  margin-top: 28px;
   padding: 15px 22px;
   font-size: 0.98rem;
   box-shadow: 0 14px 30px rgba(0, 109, 119, 0.18);
+}
+
+.secondary-action.standalone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 116px;
+  padding: 15px 18px;
+  font-size: 0.98rem;
+}
+
+.action-row,
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 28px;
+}
+
+.result-actions {
+  justify-content: center;
+  margin-top: 0;
 }
 
 .error-message {
@@ -624,6 +659,16 @@ span::selection {
   }
 
   .primary-action {
+    width: 100%;
+  }
+
+  .action-row,
+  .result-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .secondary-action.standalone {
     width: 100%;
   }
 }

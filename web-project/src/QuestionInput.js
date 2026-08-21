@@ -3,6 +3,19 @@ import uploadImage from './ImageService';
 import tasteCatalog, { categoryOrder } from './tasteCatalog';
 import { API_BASE_URL } from './config';
 
+const getResponseError = async (response, fallbackMessage) => {
+  const body = await response.json().catch(() => ({}));
+  return body.error || fallbackMessage;
+};
+
+const getRequestError = (error, fallbackMessage) => {
+  if (error instanceof TypeError) {
+    return `Could not reach the image server at ${API_BASE_URL}. Make sure the Flask backend is running.`;
+  }
+
+  return error.message || fallbackMessage;
+};
+
 function QuestionInput() {
   const [catalog, setCatalog] = useState(tasteCatalog);
   const [isCatalogLoading, setIsCatalogLoading] = useState(true);
@@ -29,9 +42,9 @@ function QuestionInput() {
     let isMounted = true;
 
     fetch(`${API_BASE_URL}/api/catalog`)
-      .then((response) => {
+      .then(async (response) => {
         if (!response.ok) {
-          throw new Error('Could not load the catalog.');
+          throw new Error(await getResponseError(response, 'Could not load the catalog.'));
         }
 
         return response.json();
@@ -44,7 +57,7 @@ function QuestionInput() {
       })
       .catch((loadError) => {
         if (isMounted) {
-          setCatalogError(loadError.message || 'Using local fallback catalog.');
+          setCatalogError(getRequestError(loadError, 'Using local fallback catalog.'));
         }
       })
       .finally(() => {
@@ -62,7 +75,8 @@ function QuestionInput() {
     setSearchQuery('');
     setSearchResults(null);
     setSearchError('');
-  }, [currentCategory]);
+    setSelectedOption(selections[currentCategory] || null);
+  }, [currentCategory, selections]);
 
   const handleOptionClick = (option) => {
     setSelectedOption(option);
@@ -85,19 +99,19 @@ function QuestionInput() {
       const response = await fetch(
         `${API_BASE_URL}/api/search/${currentCategory}?q=${encodeURIComponent(query)}`
       );
-      const body = await response.json();
 
       if (!response.ok) {
-        throw new Error(body.error || 'Search failed.');
+        throw new Error(await getResponseError(response, 'Search failed.'));
       }
 
+      const body = await response.json();
       setSearchResults(body.options);
       if (body.options.length === 0) {
         setSearchError(`No ${currentCategoryDetails.label.toLowerCase()} results found.`);
       }
     } catch (searchRequestError) {
       setSearchResults([]);
-      setSearchError(searchRequestError.message || 'Search failed.');
+      setSearchError(getRequestError(searchRequestError, 'Search failed.'));
     } finally {
       setIsSearching(false);
     }
@@ -107,7 +121,33 @@ function QuestionInput() {
     setSearchQuery('');
     setSearchResults(null);
     setSearchError('');
+    setSelectedOption(selections[currentCategory] || null);
+  };
+
+  const handleBack = () => {
+    if (currentStep === 0 || isUploading) {
+      return;
+    }
+
+    setError('');
+    setSearchError('');
+    setCurrentStep((step) => step - 1);
+  };
+
+  const handleStartOver = () => {
+    if (finalImageUrl) {
+      URL.revokeObjectURL(finalImageUrl);
+    }
+
+    setCurrentStep(0);
     setSelectedOption(null);
+    setSelections({});
+    setFinalImageUrl('');
+    setIsUploading(false);
+    setError('');
+    setSearchQuery('');
+    setSearchResults(null);
+    setSearchError('');
   };
 
   const handleConfirm = async () => {
@@ -140,7 +180,7 @@ function QuestionInput() {
         setSelectedOption(null);
       }
     } catch (uploadError) {
-      setError(uploadError.message || 'Something went wrong while saving your pick.');
+      setError(getRequestError(uploadError, 'Something went wrong while saving your pick.'));
     } finally {
       setIsUploading(false);
     }
@@ -244,14 +284,24 @@ function QuestionInput() {
 
             {error && <p className="error-message">{error}</p>}
 
-            <button
-              className="primary-action"
-              disabled={!selectedOption || isUploading}
-              onClick={handleConfirm}
-              type="button"
-            >
-              {isUploading ? 'Saving pick...' : `Confirm ${currentCategoryDetails.label}`}
-            </button>
+            <div className="action-row">
+              <button
+                className="secondary-action standalone"
+                disabled={currentStep === 0 || isUploading}
+                onClick={handleBack}
+                type="button"
+              >
+                Back
+              </button>
+              <button
+                className="primary-action"
+                disabled={!selectedOption || isUploading}
+                onClick={handleConfirm}
+                type="button"
+              >
+                {isUploading ? 'Saving pick...' : `Confirm ${currentCategoryDetails.label}`}
+              </button>
+            </div>
           </>
         ) : (
           <div className="result-panel">
@@ -263,6 +313,14 @@ function QuestionInput() {
                   <strong>{catalog[category].label}:</strong> {selections[category]?.name}
                 </p>
               ))}
+            </div>
+            <div className="result-actions">
+              <a className="primary-action" download="taste-collage.png" href={finalImageUrl}>
+                Download Image
+              </a>
+              <button className="secondary-action standalone" onClick={handleStartOver} type="button">
+                Start Over
+              </button>
             </div>
           </div>
         )}
