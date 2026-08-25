@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.js
 
@@ -13,6 +14,9 @@
 
 # misc
 .DS_Store
+*.pyc
+__pycache__/
+.pytest_cache/
 .env.local
 .env
 .env.development.local
@@ -24,6 +28,9 @@ yarn-debug.log*
 yarn-error.log*
 
 # local backend runtime data
-/backend/venv/__pycache__/
-/backend/venv/taste_catalog.db
-/backend/venv/processed_images/user_*
+/backend/.venv/
+/backend/venv/
+/backend/instance/
+/backend/uploads/
+/backend/**/*.db
+/backend/**/processed_images/

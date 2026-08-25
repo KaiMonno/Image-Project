@@ -1,0 +1,23 @@
+# JavaScript dependencies and builds
+node_modules/
+web-project/node_modules/
+web-project/build/
+
+# Python virtual environments and caches
+.venv/
+venv/
+web-project/backend/.venv/
+web-project/backend/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets and local runtime data
+.env
+web-project/.env
+*.db
+web-project/backend/instance/
+web-project/backend/**/processed_images/
+
+# OS/editor noise
+.DS_Store
