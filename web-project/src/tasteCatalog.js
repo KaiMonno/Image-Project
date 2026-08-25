@@ -4,12 +4,6 @@ const tasteCatalog = {
     prompt: 'Choose an artist that represents your taste.',
     options: [
       {
-        id: 'local-artist',
-        name: 'Local Artist',
-        description: 'Current local artist image.',
-        imageUrl: `${process.env.PUBLIC_URL}/images/image1.jpeg`,
-      },
-      {
         id: 'fallback-artist-dream-pop',
         name: 'Dream Pop',
         description: 'Soft color, grain, and late-night synth mood.',
@@ -34,12 +28,6 @@ const tasteCatalog = {
     prompt: 'Choose a film that evokes your taste.',
     options: [
       {
-        id: 'local-movie',
-        name: 'Local Movie',
-        description: 'Current local movie poster.',
-        imageUrl: `${process.env.PUBLIC_URL}/images/image2.jpg`,
-      },
-      {
         id: 'fallback-movie-noir',
         name: 'Neon Noir',
         description: 'Cinematic shadows, rain, and saturated city light.',
@@ -63,12 +51,6 @@ const tasteCatalog = {
     label: 'Show',
     prompt: 'Choose a show that describes your taste.',
     options: [
-      {
-        id: 'local-show',
-        name: 'Local Show',
-        description: 'Current local show image.',
-        imageUrl: `${process.env.PUBLIC_URL}/images/image3.jpg`,
-      },
       {
         id: 'fallback-show-prestige',
         name: 'Prestige Mystery',

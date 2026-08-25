@@ -16,6 +16,8 @@ const getRequestError = (error, fallbackMessage) => {
   return error.message || fallbackMessage;
 };
 
+const createUserId = () => `user_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
 function QuestionInput() {
   const [catalog, setCatalog] = useState(tasteCatalog);
   const [isCatalogLoading, setIsCatalogLoading] = useState(true);
@@ -30,7 +32,7 @@ function QuestionInput() {
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
-  const [userId] = useState(() => `user_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  const [userId, setUserId] = useState(createUserId);
 
   const currentCategory = categoryOrder[currentStep];
   const currentCategoryDetails = catalog[currentCategory];
@@ -143,6 +145,7 @@ function QuestionInput() {
     setSelectedOption(null);
     setSelections({});
     setFinalImageUrl('');
+    setUserId(createUserId());
     setIsUploading(false);
     setError('');
     setSearchQuery('');
