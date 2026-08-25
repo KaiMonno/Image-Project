@@ -18,6 +18,6 @@ test('renders the taste builder', async () => {
   expect(
     screen.getByText(/create an image that is representative of your taste and aesthetic/i)
   ).toBeInTheDocument();
-  expect(await screen.findByRole('button', { name: /dream pop/i })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: /the weeknd/i })).toBeInTheDocument();
   expect(screen.getByRole('searchbox', { name: /search artist/i })).toBeInTheDocument();
 });

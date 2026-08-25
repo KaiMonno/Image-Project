@@ -279,7 +279,7 @@ function QuestionInput() {
                 >
                   <img src={option.imageUrl} alt="" />
                   <strong>{option.name}</strong>
-                  <span>{option.description}</span>
+                  {option.description && <span>{option.description}</span>}
                   {option.provider && <small>Source: {option.provider}</small>}
                 </button>
               ))}

@@ -17,15 +17,15 @@ CATALOG_DETAILS = {
 }
 
 SEED_CATALOG_ITEMS = [
-    ('fallback-artist-dream-pop', 'artist', 'Dream Pop', 'Soft color, grain, and late-night synth mood.', 'fallback-artist-dream-pop.jpg'),
-    ('fallback-artist-jazz-club', 'artist', 'Jazz Club', 'Warm stage lights with a classic live-session feel.', 'fallback-artist-jazz-club.jpg'),
-    ('fallback-artist-indie-rock', 'artist', 'Indie Rock', 'High-contrast guitar texture and poster-wall energy.', 'fallback-artist-indie-rock.jpg'),
-    ('fallback-movie-noir', 'movie', 'Neon Noir', 'Cinematic shadows, rain, and saturated city light.', 'fallback-movie-noir.jpg'),
-    ('fallback-movie-sunlit', 'movie', 'Sunlit Drama', 'Open skies, warm light, and quiet character-study tone.', 'fallback-movie-sunlit.jpg'),
-    ('fallback-movie-sci-fi', 'movie', 'Analog Sci-Fi', 'Clean geometry with a retro-futurist visual palette.', 'fallback-movie-sci-fi.jpg'),
-    ('fallback-show-prestige', 'show', 'Prestige Mystery', 'Moody ensemble staging with a slow-burn atmosphere.', 'fallback-show-prestige.jpg'),
-    ('fallback-show-comedy', 'show', 'Bright Comedy', 'Playful shapes, crisp color, and upbeat sitcom pacing.', 'fallback-show-comedy.jpg'),
-    ('fallback-show-adventure', 'show', 'Adventure Serial', 'Bold landscape forms with serialized cliffhanger energy.', 'fallback-show-adventure.jpg'),
+    ('artist-weeknd', 'artist', 'The Weeknd', '', 'artist-weeknd.jpg'),
+    ('artist-olivia-rodrigo', 'artist', 'Olivia Rodrigo', '', 'artist-olivia-rodrigo.jpg'),
+    ('artist-drake', 'artist', 'Drake', '', 'artist-drake.jpg'),
+    ('movie-2001-space-odyssey', 'movie', '2001: A Space Odyssey', '', 'movie-2001-space-odyssey.jpg'),
+    ('movie-shawshank-redemption', 'movie', 'The Shawshank Redemption', '', 'movie-shawshank-redemption.jpg'),
+    ('movie-godfather', 'movie', 'The Godfather', '', 'movie-godfather.jpg'),
+    ('show-planet-earth', 'show', 'Planet Earth', '', 'show-planet-earth.jpg'),
+    ('show-avatar-last-airbender', 'show', 'Avatar: The Last Airbender', '', 'show-avatar-last-airbender.jpg'),
+    ('show-the-wire', 'show', 'The Wire', '', 'show-the-wire.jpg'),
 ]
 
 LEGACY_SEED_IDS = [
@@ -41,6 +41,15 @@ LEGACY_SEED_IDS = [
     'local-artist',
     'local-movie',
     'local-show',
+    'fallback-artist-dream-pop',
+    'fallback-artist-jazz-club',
+    'fallback-artist-indie-rock',
+    'fallback-movie-noir',
+    'fallback-movie-sunlit',
+    'fallback-movie-sci-fi',
+    'fallback-show-prestige',
+    'fallback-show-comedy',
+    'fallback-show-adventure',
 ]
 
 
@@ -65,11 +74,11 @@ def init_database(database_path):
         )
         connection.executemany(
             "DELETE FROM catalog_items WHERE id = ?",
-            [(item_id,) for item_id in LEGACY_SEED_IDS],
+            [(item_id,) for item_id in [*LEGACY_SEED_IDS, *[item[0] for item in SEED_CATALOG_ITEMS]]],
         )
         connection.executemany(
             """
-            INSERT OR IGNORE INTO catalog_items (id, category, name, description, image_filename)
+            INSERT INTO catalog_items (id, category, name, description, image_filename)
             VALUES (?, ?, ?, ?, ?)
             """,
             SEED_CATALOG_ITEMS,
