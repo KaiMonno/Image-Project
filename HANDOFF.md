@@ -257,13 +257,14 @@ Spotify and TMDB credentials are optional for the local fallback catalog, but ex
 
 ## Current State
 
-There is some minimal deployment configuration already present:
+The app is deployed to Render as two services defined in `render.yaml` at the repo root (a Blueprint) — see `DEPLOYMENT.md` for the actual deploy steps:
 
-- `web-project/backend/Procfile`
-- `gunicorn==22.0.0` in `web-project/backend/requirements.txt`
-- Gunicorn app target exposed as `wsgi:app` (see `web-project/backend/wsgi.py`)
+- `kaimonno-taste-collage-api`: a free Python web service running the existing `web-project/backend/Procfile` command (`gunicorn wsgi:app --worker-class gthread --workers 1 --threads 4`). Deliberately has no `rootDir` set (unlike the frontend service) because `app/catalog.py` reads `web-project/src/catalogSeed.json`, which sits outside `web-project/backend/` — restricting the service's root there would exclude that file from its filesystem and crash on boot.
+- `kaimonno-taste-collage-web`: a free static site (`rootDir: web-project`) serving the Create React App build, with a SPA rewrite to `index.html`.
+- Neither service has a persistent disk. This is intentional, not a gap — see `DEPLOYMENT.md`'s "Ephemeral storage" section for why that's fine given how this app actually uses local storage.
+- `CORS_ALLOWED_ORIGINS` and `REACT_APP_API_BASE_URL` are set in `render.yaml` to each service's predicted `https://<name>.onrender.com` URL; if Render had to rename either service on creation (name collision), those need a manual fix — see `DEPLOYMENT.md`.
 
-There is no Dockerfile in the current repository. There is also no platform-specific hosting configuration found in the inspected project files, such as `.openai/hosting.json`.
+There is no Dockerfile in the current repository — Render's Python/Node buildpacks are used directly instead.
 
 There is an automated test suite already present:
 
