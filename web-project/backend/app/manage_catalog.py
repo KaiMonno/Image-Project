@@ -18,10 +18,8 @@ import json
 import os
 import sys
 
-from .config import PUBLIC_IMAGE_DIR, STORAGE_CATEGORIES, WEB_PROJECT_DIR
-
-
-CATALOG_SEED_PATH = os.path.join(WEB_PROJECT_DIR, 'src', 'catalogSeed.json')
+from .catalog import CATALOG_SEED_PATH
+from .config import PUBLIC_IMAGE_DIR, STORAGE_CATEGORIES
 
 
 def load_items(seed_path):

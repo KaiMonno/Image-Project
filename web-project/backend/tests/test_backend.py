@@ -1,3 +1,4 @@
+import importlib
 import os
 import time
 from io import BytesIO
@@ -34,6 +35,20 @@ def make_image_file(color, size=(120, 180), image_format='PNG'):
     return output
 
 
+def test_importing_app_package_does_not_eagerly_boot_the_app():
+    # app/__init__.py must only define create_app(), not call it at module
+    # scope -- otherwise importing any submodule (app.config, app.catalog,
+    # the manage_catalog CLI, or even pytest collecting this file) would
+    # boot a real Flask app against the default instance/ paths as a side
+    # effect, including running cleanup_stale_images() against real files.
+    # The actual WSGI app instance lives in wsgi.py instead.
+    import app as app_package
+
+    importlib.reload(app_package)
+
+    assert not hasattr(app_package, 'app')
+
+
 def test_search_rejects_invalid_category(client):
     response = client.get('/api/search/book?q=test')
 
@@ -64,6 +79,20 @@ def test_upload_rejects_invalid_category(client):
 
     assert response.status_code == 400
     assert response.get_json()['error'] == 'Unknown category.'
+
+
+def test_upload_rejects_path_traversal_user_id(client, tmp_path):
+    response = client.post(
+        '/upload-image/artist',
+        query_string={'user_id': '../../evil'},
+        data={'image': (make_image_file('red'), 'image.png')},
+        content_type='multipart/form-data',
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()['error'] == 'Invalid user_id.'
+    # Confirms the rejection happens before any file write is attempted.
+    assert os.listdir(tmp_path / 'processed_images') == []
 
 
 def test_upload_rejects_corrupted_image(client):

@@ -13,7 +13,7 @@ from .providers import (
     search_spotify_artists,
     search_tmdb,
 )
-from .storage import all_images_uploaded, get_category_path, get_remaining_categories
+from .storage import all_images_uploaded, get_category_path, get_remaining_categories, is_valid_user_id
 
 
 blueprint = Blueprint('taste_collage', __name__)
@@ -88,6 +88,9 @@ def upload_image(category):
         return jsonify(error='No image was uploaded.'), 400
 
     user_id = request.args.get('user_id', 'default_user').strip() or 'default_user'
+    if not is_valid_user_id(user_id):
+        return jsonify(error='Invalid user_id.'), 400
+
     image_file = request.files['image']
 
     try:

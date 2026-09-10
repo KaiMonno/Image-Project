@@ -146,7 +146,10 @@ def _most_detailed_offset(edge_map, max_offset, window_size, horizontal):
     best_score = score_at(best_offset)
 
     step = max(1, max_offset // SMART_CROP_CANDIDATES)
-    for offset in range(0, max_offset + 1, step):
+    # Explicitly include max_offset: range() alone would only land on it by
+    # coincidence when it happens to be a multiple of step, otherwise the
+    # most extreme valid crop position would never be considered.
+    for offset in (*range(0, max_offset, step), max_offset):
         score = score_at(offset)
         if score > best_score:
             best_score = score
