@@ -215,11 +215,19 @@ function QuestionInput() {
 
           <div className="hero-preview" aria-hidden="true">
             {categoryOrder.map((category, index) => {
+              // catalog[category].options can be empty if the catalog was
+              // edited down to zero entries for that category (see
+              // app/manage_catalog.py), so this can't assume an option
+              // always exists.
               const previewOption = selections[category] || catalog[category].options[0];
 
               return (
                 <div className={`preview-tile preview-tile-${index + 1}`} key={category}>
-                  <img src={previewOption.imageUrl} alt="" />
+                  {previewOption ? (
+                    <img src={previewOption.imageUrl} alt="" />
+                  ) : (
+                    <div style={{ aspectRatio: '2 / 3' }} />
+                  )}
                   <span>{catalog[category].label}</span>
                 </div>
               );
@@ -280,6 +288,12 @@ function QuestionInput() {
             </form>
 
             {searchError && <p className="error-message">{searchError}</p>}
+
+            {searchResults === null && displayedOptions.length === 0 && (
+              <p className="status-message">
+                No {currentCategoryDetails.label.toLowerCase()} options are in the catalog yet. Try searching above.
+              </p>
+            )}
 
             <div className="option-grid">
               {displayedOptions.map((option) => (
