@@ -16,7 +16,19 @@ const getRequestError = (error, fallbackMessage) => {
   return error.message || fallbackMessage;
 };
 
-const createUserId = () => `user_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+const createUserId = () => {
+  // crypto.randomUUID() gives ~122 bits of entropy, making it infeasible to
+  // guess or enumerate another in-progress user's id (unlike a timestamp +
+  // Math.random(), which is guessable within a narrow, known time window).
+  // It's available in secure contexts (HTTPS, or localhost for local dev)
+  // in all current browsers; the fallback below only matters for very old
+  // browsers or a non-HTTPS deployment.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `user_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+};
 
 function QuestionInput() {
   const [catalog, setCatalog] = useState(tasteCatalog);

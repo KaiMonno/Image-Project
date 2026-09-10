@@ -135,6 +135,18 @@ The proxy rejects non-image content types. It returns the proxied image bytes wi
 
 SQLite support lives in `web-project/backend/app/storage.py`. Catalog seed *items* (id/category/name/description/image filename) live in `web-project/src/catalogSeed.json` and are loaded by `web-project/backend/app/catalog.py` at import time; this is the single source of truth shared with the frontend's fallback catalog (see Tech Stack And Architecture above). Per-category label/prompt copy for the API response (distinct from the frontend's own copy) still lives in `CATALOG_DETAILS` in `catalog.py`.
 
+To add, remove, or list entries in `catalogSeed.json` without hand-editing JSON, use the CLI in `web-project/backend/app/manage_catalog.py`:
+
+```bash
+cd web-project/backend
+. venv/bin/activate
+python -m app.manage_catalog list
+python -m app.manage_catalog add --id show-the-office --category show --name "The Office" --image-filename show-the-office.jpg
+python -m app.manage_catalog remove --id show-the-office
+```
+
+`add` requires the image file to already exist in `web-project/public/images/`. Either command only edits the JSON file — restart the backend afterward so `init_database()` re-seeds SQLite from it.
+
 The SQLite table is `catalog_items` with these columns:
 
 - `id`
@@ -254,17 +266,17 @@ There is no Dockerfile in the current repository. There is also no platform-spec
 
 There is an automated test suite already present:
 
-- Backend pytest tests: `web-project/backend/tests/test_backend.py`
+- Backend pytest tests: `web-project/backend/tests/test_backend.py`, `web-project/backend/tests/test_manage_catalog.py`
 - Frontend Create React App test: `web-project/src/App.test.js`
 
 The backend tests cover several route and image-processing behaviors, but they should be treated as a starting point rather than a complete deployment-readiness suite.
 
 ## Known Issues Or Incomplete Pieces
 
-- The image cropper uses simple center crop logic, so faces, posters, logos, and title text may be cropped awkwardly. Fixing this properly (face/saliency-aware cropping) needs a new dependency (e.g. OpenCV or a face-detection library) not currently in `requirements.txt` — not yet added, pending a decision on which library to take on.
-- Runtime image storage has no authentication or per-user access control beyond the generated `user_id` naming convention. The frontend generates `user_id` client-side (`createUserId()` in `QuestionInput.js`) as a timestamp + random string, which is unguessable-ish but not real auth — there's no login system, and any client that guesses or is given a `user_id` can read/overwrite that user's images. Adding real auth (accounts, sessions, or at minimum a server-issued unguessable token) would change the API contract between frontend and backend and hasn't been done.
-- The SQLite catalog is static seeded data (from `web-project/src/catalogSeed.json`, see SQLite Usage above). There is no admin UI or API for editing catalog entries.
-- Basic tests exist, but there is no comprehensive end-to-end test suite for the full React-to-Flask image selection and collage flow (would need a browser-automation tool like Playwright or Cypress, not currently a dependency).
-- Provider search uses synchronous `urllib` requests inside Flask handlers. This is now mitigated at the WSGI/dev-server level (`--worker-class gthread --threads 4` in the Procfile, `threaded=True` in `run.py`) so one slow provider call no longer blocks every other request on that worker — but the handlers themselves are still blocking synchronous code, not true async I/O.
+- The image cropper now uses a generic "smart crop" heuristic (`choose_crop_offset()` in `web-project/backend/app/collage.py`) instead of always cutting from the exact center: it samples candidate crop windows along the overflow axis and keeps whichever has the most edge density (via `ImageFilter.FIND_EDGES` + `ImageStat`), falling back to the old center crop when there's no meaningful signal (e.g. a flat background). This has no real concept of faces, posters, logos, or text, so it can still pick a busy background over a face in principle — it's a generic improvement, not a targeted fix, and adding true face/saliency detection would still need a new dependency (e.g. OpenCV) if wanted later.
+- Runtime image storage still has no real authentication or per-user authorization. `createUserId()` in `QuestionInput.js` now uses `crypto.randomUUID()` (with a fallback for very old browsers/non-HTTPS), which makes guessing or enumerating another in-progress `user_id` computationally infeasible — but it's still a bearer-style id with no server-side ownership check: whoever holds a given `user_id` (by having it, not by proving identity) can read/overwrite that user's images. There is still no login system or session-based authorization; that would be a larger, separate feature if ever wanted.
+- The SQLite catalog is still static seeded data, but it's no longer edited by hand: `python -m app.manage_catalog {list,add,remove}` (in `web-project/backend/app/manage_catalog.py`, run from `web-project/backend` with the venv active) safely adds/removes/lists entries in `web-project/src/catalogSeed.json` with validation (unique id, known category, image file must already exist in `web-project/public/images/`). It edits the seed file only — the app still needs a restart to re-seed SQLite from it, and there is intentionally no HTTP-exposed admin API/UI (that would need its own authorization, per the item above).
+- There is still no browser-driven end-to-end test suite (nothing using Playwright/Cypress), but `test_full_catalog_to_collage_flow_via_http` in `test_backend.py` now exercises the full HTTP request sequence the real frontend makes — load `/api/catalog`, fetch each selected item's actual image via the app's own routes, upload each one — using real bundled catalog images rather than synthetic ones, ending in a real generated collage. `test_uploads_for_different_user_ids_do_not_interfere` also guards the per-`user_id` file isolation this all depends on. This still never touches React or a real browser, so it wouldn't catch a frontend-only bug (e.g. a broken button) or a real CORS misconfiguration.
+- Provider search uses synchronous `urllib` requests inside Flask handlers. This is mitigated at the WSGI/dev-server level (`--worker-class gthread --threads 4` in the Procfile, `threaded=True` in `run.py`) so one slow provider call no longer blocks every other request on that worker — but the handlers themselves are still blocking synchronous code, not true async I/O.
 - `CORS_ALLOWED_ORIGINS` defaults to localhost only by design; deployed frontend origins still need to be set explicitly via that env var (an example is in `.env.example`). This is expected/documented behavior, not a defect.
 - A local `web-project/.env` file exists on disk for local credentials. It is already covered by `.gitignore` (both `/.gitignore` and `web-project/.gitignore` list `.env` and `web-project/.env`) and was confirmed not tracked by git — no action needed here, kept as a reminder not to force-add it.
