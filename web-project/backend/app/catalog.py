@@ -1,4 +1,8 @@
+import json
+import os
 import sqlite3
+
+from .config import WEB_PROJECT_DIR
 
 
 CATALOG_DETAILS = {
@@ -16,17 +20,22 @@ CATALOG_DETAILS = {
     },
 }
 
-SEED_CATALOG_ITEMS = [
-    ('artist-weeknd', 'artist', 'The Weeknd', '', 'artist-weeknd.jpg'),
-    ('artist-olivia-rodrigo', 'artist', 'Olivia Rodrigo', '', 'artist-olivia-rodrigo.jpg'),
-    ('artist-drake', 'artist', 'Drake', '', 'artist-drake.jpg'),
-    ('movie-2001-space-odyssey', 'movie', '2001: A Space Odyssey', '', 'movie-2001-space-odyssey.jpg'),
-    ('movie-shawshank-redemption', 'movie', 'The Shawshank Redemption', '', 'movie-shawshank-redemption.jpg'),
-    ('movie-godfather', 'movie', 'The Godfather', '', 'movie-godfather.jpg'),
-    ('show-planet-earth', 'show', 'Planet Earth', '', 'show-planet-earth.jpg'),
-    ('show-avatar-last-airbender', 'show', 'Avatar: The Last Airbender', '', 'show-avatar-last-airbender.jpg'),
-    ('show-the-wire', 'show', 'The Wire', '', 'show-the-wire.jpg'),
-]
+# The frontend's fallback catalog (web-project/src/tasteCatalog.js) reads the
+# same file, so this is the single source of truth for which items exist.
+CATALOG_SEED_PATH = os.path.join(WEB_PROJECT_DIR, 'src', 'catalogSeed.json')
+
+
+def _load_seed_items(seed_path):
+    with open(seed_path, encoding='utf-8') as seed_file:
+        raw_items = json.load(seed_file)
+
+    return [
+        (item['id'], item['category'], item['name'], item.get('description', ''), item['imageFilename'])
+        for item in raw_items
+    ]
+
+
+SEED_CATALOG_ITEMS = _load_seed_items(CATALOG_SEED_PATH)
 
 LEGACY_SEED_IDS = [
     'artist-visual',

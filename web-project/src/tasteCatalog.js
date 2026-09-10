@@ -1,68 +1,48 @@
-const tasteCatalog = {
+import catalogSeed from './catalogSeed.json';
+
+// Item data (id/category/name/imageFilename) lives in catalogSeed.json, the
+// same file the backend reads to seed its SQLite catalog
+// (web-project/backend/app/catalog.py). This file only adds the per-category
+// label/prompt copy shown before the live /api/catalog response arrives.
+const CATALOG_DETAILS = {
   artist: {
     label: 'Artist',
     prompt: 'Choose an artist that represents your taste.',
-    options: [
-      {
-        id: 'artist-weeknd',
-        name: 'The Weeknd',
-        imageUrl: `${process.env.PUBLIC_URL}/images/artist-weeknd.jpg`,
-      },
-      {
-        id: 'artist-olivia-rodrigo',
-        name: 'Olivia Rodrigo',
-        imageUrl: `${process.env.PUBLIC_URL}/images/artist-olivia-rodrigo.jpg`,
-      },
-      {
-        id: 'artist-drake',
-        name: 'Drake',
-        imageUrl: `${process.env.PUBLIC_URL}/images/artist-drake.jpg`,
-      },
-    ],
   },
   movie: {
     label: 'Movie',
     prompt: 'Choose a film that evokes your taste.',
-    options: [
-      {
-        id: 'movie-2001-space-odyssey',
-        name: '2001: A Space Odyssey',
-        imageUrl: `${process.env.PUBLIC_URL}/images/movie-2001-space-odyssey.jpg`,
-      },
-      {
-        id: 'movie-shawshank-redemption',
-        name: 'The Shawshank Redemption',
-        imageUrl: `${process.env.PUBLIC_URL}/images/movie-shawshank-redemption.jpg`,
-      },
-      {
-        id: 'movie-godfather',
-        name: 'The Godfather',
-        imageUrl: `${process.env.PUBLIC_URL}/images/movie-godfather.jpg`,
-      },
-    ],
   },
   show: {
     label: 'Show',
     prompt: 'Choose a show that describes your taste.',
-    options: [
-      {
-        id: 'show-planet-earth',
-        name: 'Planet Earth',
-        imageUrl: `${process.env.PUBLIC_URL}/images/show-planet-earth.jpg`,
-      },
-      {
-        id: 'show-avatar-last-airbender',
-        name: 'Avatar: The Last Airbender',
-        imageUrl: `${process.env.PUBLIC_URL}/images/show-avatar-last-airbender.jpg`,
-      },
-      {
-        id: 'show-the-wire',
-        name: 'The Wire',
-        imageUrl: `${process.env.PUBLIC_URL}/images/show-the-wire.jpg`,
-      },
-    ],
   },
 };
+
+const buildCatalog = () => {
+  const catalog = Object.fromEntries(
+    Object.entries(CATALOG_DETAILS).map(([category, details]) => [
+      category,
+      { ...details, options: [] },
+    ])
+  );
+
+  catalogSeed.forEach((item) => {
+    if (!catalog[item.category]) {
+      return;
+    }
+
+    catalog[item.category].options.push({
+      id: item.id,
+      name: item.name,
+      imageUrl: `${process.env.PUBLIC_URL}/images/${item.imageFilename}`,
+    });
+  });
+
+  return catalog;
+};
+
+const tasteCatalog = buildCatalog();
 
 export const categoryOrder = ['artist', 'movie', 'show'];
 

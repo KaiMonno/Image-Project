@@ -14,7 +14,7 @@ Frontend:
 - Runtime API base URL: `web-project/src/config.js`.
 - Default backend URL: `http://127.0.0.1:5001`.
 - Override variable: `REACT_APP_API_BASE_URL`.
-- Local fallback catalog: `web-project/src/tasteCatalog.js`.
+- Local fallback catalog: `web-project/src/tasteCatalog.js`. Item data (id/category/name/image filename) is not hardcoded here; it's read from `web-project/src/catalogSeed.json`, the same file the backend reads to seed SQLite (see SQLite Usage below). Only per-category label/prompt copy is hardcoded in `tasteCatalog.js`.
 - Static images: `web-project/public/images/`.
 
 Backend:
@@ -129,11 +129,11 @@ Image proxying is handled in `web-project/backend/app/image_proxy.py`. The proxy
 - `i.scdn.co`
 - `mosaic.scdn.co`
 
-The proxy rejects non-image content types. It returns the proxied image bytes with a one-day public cache header. There is currently no explicit maximum download byte limit.
+The proxy rejects non-image content types. It returns the proxied image bytes with a one-day public cache header. It enforces a maximum download size via `MAX_PROXY_IMAGE_BYTES` (default 10 MB, see `web-project/backend/app/config.py`), checked against the upstream `Content-Length` header when present and re-checked against the actual bytes read so a missing or understated `Content-Length` can't bypass the limit.
 
 ## SQLite Usage
 
-SQLite support lives in `web-project/backend/app/storage.py`. Catalog seed data lives in `web-project/backend/app/catalog.py`.
+SQLite support lives in `web-project/backend/app/storage.py`. Catalog seed *items* (id/category/name/description/image filename) live in `web-project/src/catalogSeed.json` and are loaded by `web-project/backend/app/catalog.py` at import time; this is the single source of truth shared with the frontend's fallback catalog (see Tech Stack And Architecture above). Per-category label/prompt copy for the API response (distinct from the frontend's own copy) still lives in `CATALOG_DETAILS` in `catalog.py`.
 
 The SQLite table is `catalog_items` with these columns:
 
@@ -173,6 +173,8 @@ web-project/backend/instance/taste_catalog.db
 
 That file is generated at runtime by `init_database()` and should not be committed. The seeded static catalog does not need database persistence across restarts because it is recreated deterministically from source code. Uploaded user images and generated combined images are stored on the local filesystem under `backend/instance/processed_images`; those files would need persistent storage only if a deployment is expected to preserve in-progress or generated collages across restarts.
 
+On each app startup, `cleanup_stale_images()` in `web-project/backend/app/cleanup.py` deletes any file in that directory whose modified time is older than `IMAGE_RETENTION_HOURS` (default 24, set to `0` to disable). This is a best-effort startup sweep, not a live background schedule — files older than the retention window only get removed the next time the app process starts (e.g. the next gunicorn worker boot or `run.py` restart), not continuously while it runs.
+
 ## How To Run Locally
 
 Install and run the backend:
@@ -182,8 +184,10 @@ cd web-project/backend
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
-gunicorn app:app --bind 127.0.0.1:5001
+gunicorn app:app --bind 127.0.0.1:5001 --worker-class gthread --workers 2 --threads 4
 ```
+
+The `--worker-class gthread --threads 4` flags (also set in `web-project/backend/Procfile`) let one worker process handle several requests concurrently on separate threads. This matters because provider search and image-proxy requests use blocking `urllib` calls (see Third-Party Integrations and Known Issues below); without threads, a slow upstream call would stall every other request on that worker.
 
 For local Flask debug mode, this also works:
 
@@ -192,6 +196,8 @@ cd web-project/backend
 . .venv/bin/activate
 python run.py
 ```
+
+`run.py` calls `app.run(..., threaded=True)` for the same reason.
 
 Install and run the frontend:
 
@@ -228,7 +234,11 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 TASTE_COLLAGE_DATA_DIR=backend/instance
 REACT_APP_API_BASE_URL=http://127.0.0.1:5001
 CORS_ALLOWED_ORIGINS=http://localhost:3000,https://your-frontend.example.com
+MAX_PROXY_IMAGE_BYTES=10485760
+IMAGE_RETENTION_HOURS=24
 ```
+
+`MAX_PROXY_IMAGE_BYTES` and `IMAGE_RETENTION_HOURS` are optional; the values above are the built-in defaults, shown for reference.
 
 Spotify and TMDB credentials are optional for the local fallback catalog, but external search will return provider configuration errors without them.
 
@@ -251,13 +261,10 @@ The backend tests cover several route and image-processing behaviors, but they s
 
 ## Known Issues Or Incomplete Pieces
 
-- The image cropper uses simple center crop logic, so faces, posters, logos, and title text may be cropped awkwardly.
-- Uploaded and generated images are stored on the local filesystem with no cleanup job.
-- Runtime image storage has no authentication or per-user access control beyond the generated `user_id` naming convention.
-- The image proxy validates scheme, hostname, and content type, but it does not enforce a maximum response size.
-- The frontend fallback catalog duplicates backend seed data, so the two can drift if one is updated without the other.
-- `CORS_ALLOWED_ORIGINS` defaults to localhost only; deployed frontend origins need to be configured explicitly.
-- Provider search uses synchronous `urllib` requests inside Flask handlers.
-- The SQLite catalog is static seeded data. There is no admin UI or API for editing catalog entries.
-- A local `web-project/.env` file exists on disk. It should remain ignored and should not be committed.
-- Basic tests exist, but there is no comprehensive end-to-end test suite for the full React-to-Flask image selection and collage flow.
+- The image cropper uses simple center crop logic, so faces, posters, logos, and title text may be cropped awkwardly. Fixing this properly (face/saliency-aware cropping) needs a new dependency (e.g. OpenCV or a face-detection library) not currently in `requirements.txt` — not yet added, pending a decision on which library to take on.
+- Runtime image storage has no authentication or per-user access control beyond the generated `user_id` naming convention. The frontend generates `user_id` client-side (`createUserId()` in `QuestionInput.js`) as a timestamp + random string, which is unguessable-ish but not real auth — there's no login system, and any client that guesses or is given a `user_id` can read/overwrite that user's images. Adding real auth (accounts, sessions, or at minimum a server-issued unguessable token) would change the API contract between frontend and backend and hasn't been done.
+- The SQLite catalog is static seeded data (from `web-project/src/catalogSeed.json`, see SQLite Usage above). There is no admin UI or API for editing catalog entries.
+- Basic tests exist, but there is no comprehensive end-to-end test suite for the full React-to-Flask image selection and collage flow (would need a browser-automation tool like Playwright or Cypress, not currently a dependency).
+- Provider search uses synchronous `urllib` requests inside Flask handlers. This is now mitigated at the WSGI/dev-server level (`--worker-class gthread --threads 4` in the Procfile, `threaded=True` in `run.py`) so one slow provider call no longer blocks every other request on that worker — but the handlers themselves are still blocking synchronous code, not true async I/O.
+- `CORS_ALLOWED_ORIGINS` defaults to localhost only by design; deployed frontend origins still need to be set explicitly via that env var (an example is in `.env.example`). This is expected/documented behavior, not a defect.
+- A local `web-project/.env` file exists on disk for local credentials. It is already covered by `.gitignore` (both `/.gitignore` and `web-project/.gitignore` list `.env` and `web-project/.env`) and was confirmed not tracked by git — no action needed here, kept as a reminder not to force-add it.

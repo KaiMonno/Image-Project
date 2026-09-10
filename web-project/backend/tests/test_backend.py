@@ -1,11 +1,15 @@
+import os
+import time
 from io import BytesIO
 
 import pytest
 from PIL import Image
 
 from app import create_app
+from app import image_proxy
+from app.cleanup import cleanup_stale_images
 from app.collage import CARD_SIZE, CollageGenerationError, combine_images, fill_box
-from app.image_proxy import ImageProxyError, validate_proxy_url
+from app.image_proxy import ImageProxyError, fetch_proxy_image, validate_proxy_url
 from app.providers import ProviderConfigurationError, ProviderRequestError
 from app.storage import get_remaining_categories
 
@@ -104,6 +108,100 @@ def test_image_proxy_rejects_unapproved_host(client):
 def test_image_proxy_rejects_non_https_url():
     with pytest.raises(ImageProxyError):
         validate_proxy_url('http://image.tmdb.org/t/p/w500/poster.jpg')
+
+
+class FakeProxyResponse:
+    def __init__(self, body, content_type='image/jpeg', content_length=None):
+        self._body = body
+        self._content_type = content_type
+        self._content_length = content_length
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def read(self, size=-1):
+        if size is None or size < 0:
+            data, self._body = self._body, b''
+        else:
+            data, self._body = self._body[:size], self._body[size:]
+        return data
+
+    @property
+    def headers(self):
+        response = self
+
+        class Headers:
+            def get_content_type(self):
+                return response._content_type
+
+            def get(self, key, default=None):
+                if key == 'Content-Length':
+                    return response._content_length
+                return default
+
+        return Headers()
+
+
+def test_fetch_proxy_image_rejects_oversized_content_length(monkeypatch):
+    monkeypatch.setattr(
+        image_proxy, 'urlopen', lambda *args, **kwargs: FakeProxyResponse(b'small', content_length='999')
+    )
+
+    with pytest.raises(ImageProxyError):
+        fetch_proxy_image('https://image.tmdb.org/t/p/w500/poster.jpg', max_bytes=10)
+
+
+def test_fetch_proxy_image_rejects_oversized_body_without_content_length(monkeypatch):
+    monkeypatch.setattr(image_proxy, 'urlopen', lambda *args, **kwargs: FakeProxyResponse(b'x' * 20))
+
+    with pytest.raises(ImageProxyError):
+        fetch_proxy_image('https://image.tmdb.org/t/p/w500/poster.jpg', max_bytes=10)
+
+
+def test_fetch_proxy_image_allows_body_within_limit(monkeypatch):
+    monkeypatch.setattr(image_proxy, 'urlopen', lambda *args, **kwargs: FakeProxyResponse(b'x' * 5))
+
+    image_bytes, content_type = fetch_proxy_image(
+        'https://image.tmdb.org/t/p/w500/poster.jpg', max_bytes=10
+    )
+
+    assert image_bytes == b'x' * 5
+    assert content_type == 'image/jpeg'
+
+
+def test_cleanup_stale_images_removes_old_files_only(tmp_path):
+    storage_dir = tmp_path / 'processed_images'
+    storage_dir.mkdir()
+
+    old_file = storage_dir / 'old-user_combined.png'
+    old_file.write_bytes(b'old')
+    new_file = storage_dir / 'new-user_combined.png'
+    new_file.write_bytes(b'new')
+
+    old_time = time.time() - (48 * 3600)
+    os.utime(old_file, (old_time, old_time))
+
+    cleanup_stale_images(str(storage_dir), max_age_seconds=24 * 3600)
+
+    assert not old_file.exists()
+    assert new_file.exists()
+
+
+def test_cleanup_stale_images_is_noop_when_disabled(tmp_path):
+    storage_dir = tmp_path / 'processed_images'
+    storage_dir.mkdir()
+
+    old_file = storage_dir / 'old-user_combined.png'
+    old_file.write_bytes(b'old')
+    old_time = time.time() - (48 * 3600)
+    os.utime(old_file, (old_time, old_time))
+
+    cleanup_stale_images(str(storage_dir), max_age_seconds=0)
+
+    assert old_file.exists()
 
 
 def test_missing_uploaded_images_are_reported(tmp_path):

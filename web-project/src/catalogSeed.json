@@ -1,0 +1,11 @@
+[
+  { "id": "artist-weeknd", "category": "artist", "name": "The Weeknd", "description": "", "imageFilename": "artist-weeknd.jpg" },
+  { "id": "artist-olivia-rodrigo", "category": "artist", "name": "Olivia Rodrigo", "description": "", "imageFilename": "artist-olivia-rodrigo.jpg" },
+  { "id": "artist-drake", "category": "artist", "name": "Drake", "description": "", "imageFilename": "artist-drake.jpg" },
+  { "id": "movie-2001-space-odyssey", "category": "movie", "name": "2001: A Space Odyssey", "description": "", "imageFilename": "movie-2001-space-odyssey.jpg" },
+  { "id": "movie-shawshank-redemption", "category": "movie", "name": "The Shawshank Redemption", "description": "", "imageFilename": "movie-shawshank-redemption.jpg" },
+  { "id": "movie-godfather", "category": "movie", "name": "The Godfather", "description": "", "imageFilename": "movie-godfather.jpg" },
+  { "id": "show-planet-earth", "category": "show", "name": "Planet Earth", "description": "", "imageFilename": "show-planet-earth.jpg" },
+  { "id": "show-avatar-last-airbender", "category": "show", "name": "Avatar: The Last Airbender", "description": "", "imageFilename": "show-avatar-last-airbender.jpg" },
+  { "id": "show-the-wire", "category": "show", "name": "The Wire", "description": "", "imageFilename": "show-the-wire.jpg" }
+]

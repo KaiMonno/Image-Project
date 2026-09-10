@@ -2,7 +2,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from .config import ALLOWED_IMAGE_HOSTS
+from .config import ALLOWED_IMAGE_HOSTS, MAX_PROXY_IMAGE_BYTES
 
 
 class ImageProxyError(Exception):
@@ -20,7 +20,7 @@ def validate_proxy_url(image_url):
     return parsed_url
 
 
-def fetch_proxy_image(image_url):
+def fetch_proxy_image(image_url, max_bytes=MAX_PROXY_IMAGE_BYTES):
     validate_proxy_url(image_url)
 
     try:
@@ -30,7 +30,21 @@ def fetch_proxy_image(image_url):
             if not content_type.startswith('image/'):
                 raise ImageProxyError('The provider did not return an image.', 502)
 
-            return response.read(), content_type
+            content_length = response.headers.get('Content-Length')
+            if content_length is not None:
+                try:
+                    if int(content_length) > max_bytes:
+                        raise ImageProxyError('The provider image is too large.', 502)
+                except ValueError:
+                    pass
+
+            # Read one byte past the limit so an oversized body is caught even
+            # when the server omits or understates Content-Length.
+            image_bytes = response.read(max_bytes + 1)
+            if len(image_bytes) > max_bytes:
+                raise ImageProxyError('The provider image is too large.', 502)
+
+            return image_bytes, content_type
     except ImageProxyError:
         raise
     except (HTTPError, URLError, TimeoutError) as error:

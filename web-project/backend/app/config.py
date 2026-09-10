@@ -21,6 +21,9 @@ SPOTIFY_API_URL = 'https://api.spotify.com/v1'
 SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 ALLOWED_IMAGE_HOSTS = {'image.tmdb.org', 'i.scdn.co', 'mosaic.scdn.co'}
 DEFAULT_CORS_ORIGINS = ['http://localhost:3000']
+MAX_PROXY_IMAGE_BYTES = int(os.environ.get('MAX_PROXY_IMAGE_BYTES', 10 * 1024 * 1024))
+IMAGE_RETENTION_HOURS = float(os.environ.get('IMAGE_RETENTION_HOURS', 24))
+IMAGE_RETENTION_SECONDS = IMAGE_RETENTION_HOURS * 3600
 
 
 def load_environment_file(filepath):
@@ -44,6 +47,8 @@ def default_app_config():
         'STORAGE_DIR': STORAGE_DIR,
         'STORAGE_CATEGORIES': STORAGE_CATEGORIES,
         'CORS_ALLOWED_ORIGINS': get_allowed_origins(),
+        'MAX_PROXY_IMAGE_BYTES': MAX_PROXY_IMAGE_BYTES,
+        'IMAGE_RETENTION_SECONDS': IMAGE_RETENTION_SECONDS,
     }
 
 

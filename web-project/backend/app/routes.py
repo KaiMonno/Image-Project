@@ -64,7 +64,9 @@ def proxy_external_image():
     image_url = request.args.get('url', '').strip()
 
     try:
-        image_bytes, content_type = fetch_proxy_image(image_url)
+        image_bytes, content_type = fetch_proxy_image(
+            image_url, max_bytes=current_app.config['MAX_PROXY_IMAGE_BYTES']
+        )
     except ImageProxyError as error:
         return jsonify(error=str(error)), error.status_code
 
